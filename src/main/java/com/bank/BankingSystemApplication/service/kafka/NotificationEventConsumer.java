@@ -14,6 +14,11 @@ public class NotificationEventConsumer {
     
     @KafkaListener(topics = KafkaConfig.NOTIFICATION_TOPIC, groupId = "banking-notification-group")
     public void handleNotificationEvent(NotificationEvent event) {
+        if (event == null) {
+            logger.warn("Evento de notificação nulo recebido, ignorando");
+            return;
+        }
+        
         try {
             logger.info("Processando notificação: {} para conta: {}", 
                        event.getEventId(), event.getAccountId());

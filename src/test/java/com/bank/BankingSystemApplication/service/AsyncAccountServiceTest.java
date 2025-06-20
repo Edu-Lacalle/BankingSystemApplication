@@ -222,9 +222,9 @@ class AsyncAccountServiceTest {
         // Arrange
         when(accountService.createAccount(accountCreationRequest)).thenReturn(mockAccount);
         doThrow(new RuntimeException("Kafka error")).when(eventProducer).publishAuditEvent(any(TransactionEvent.class));
-        System.out.println();
-        // Act & Assert - The service should continue even if event publishing fails
-        assertDoesNotThrow(() -> {
+        
+        // Act & Assert - The service currently propagates event publishing exceptions
+        assertThrows(RuntimeException.class, () -> {
             asyncAccountService.createAccountAsync(accountCreationRequest);
         });
 

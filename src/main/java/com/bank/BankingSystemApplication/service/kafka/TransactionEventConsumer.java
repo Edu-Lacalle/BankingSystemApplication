@@ -14,6 +14,11 @@ public class TransactionEventConsumer {
     
     @KafkaListener(topics = KafkaConfig.TRANSACTION_TOPIC, groupId = "banking-transaction-group")
     public void handleTransactionEvent(TransactionEvent event) {
+        if (event == null) {
+            logger.warn("Evento de transação nulo recebido, ignorando");
+            return;
+        }
+        
         try {
             logger.info("Processando evento de transação: {} para conta: {}", 
                        event.getEventId(), event.getAccountId());
@@ -34,6 +39,11 @@ public class TransactionEventConsumer {
     
     @KafkaListener(topics = KafkaConfig.AUDIT_TOPIC, groupId = "banking-audit-group")
     public void handleAuditEvent(TransactionEvent event) {
+        if (event == null) {
+            logger.warn("Evento de auditoria nulo recebido, ignorando");
+            return;
+        }
+        
         try {
             logger.info("Registrando auditoria para evento: {} - Conta: {} - Valor: {}", 
                        event.getEventId(), event.getAccountId(), event.getAmount());

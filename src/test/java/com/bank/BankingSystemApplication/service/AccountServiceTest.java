@@ -8,6 +8,8 @@ import com.bank.BankingSystemApplication.entity.Account;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -17,10 +19,14 @@ import java.time.LocalDate;
 import static org.junit.jupiter.api.Assertions.*;
 
 @SpringBootTest
+@TestPropertySource(properties = "spring.autoconfigure.exclude=org.springframework.boot.autoconfigure.kafka.KafkaAutoConfiguration")
 public class AccountServiceTest {
     
     @Autowired
     private AccountService accountService;
+    
+    @MockBean
+    private KafkaTemplate<String, Object> kafkaTemplate;
     
     @Test
     public void testCreateAccountSuccess() {
@@ -115,6 +121,7 @@ public class AccountServiceTest {
         assertEquals(Status.RECUSADO, response.getStatus());
         
         Account updatedAccount = accountService.getAccountById(account.getId());
-        assertEquals(BigDecimal.ZERO, updatedAccount.getBalance());
+        assertEquals(0, BigDecimal.ZERO.compareTo(updatedAccount.getBalance()));
+
     }
 }
