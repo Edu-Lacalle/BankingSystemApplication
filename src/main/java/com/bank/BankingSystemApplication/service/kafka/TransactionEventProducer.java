@@ -3,11 +3,16 @@ package com.bank.BankingSystemApplication.service.kafka;
 import com.bank.BankingSystemApplication.config.KafkaConfig;
 import com.bank.BankingSystemApplication.dto.TransactionEvent;
 import com.bank.BankingSystemApplication.dto.NotificationEvent;
+import io.github.resilience4j.retry.annotation.Retry;
+import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.kafka.core.KafkaTemplate;
+import org.springframework.kafka.support.SendResult;
 import org.springframework.stereotype.Service;
+
+import java.util.concurrent.CompletableFuture;
 
 @Service
 public class TransactionEventProducer {
@@ -17,30 +22,68 @@ public class TransactionEventProducer {
     @Autowired
     private KafkaTemplate<String, Object> kafkaTemplate;
     
-    public void publishTransactionEvent(TransactionEvent event) {
-        try {
-            logger.info("Publicando evento de transação: {}", event.getEventId());
-            kafkaTemplate.send(KafkaConfig.TRANSACTION_TOPIC, event.getEventId(), event);
-        } catch (Exception e) {
-            logger.error("Erro ao publicar evento de transação: {}", e.getMessage(), e);
-        }
+    @Retry(name = "banking-service", fallbackMethod = "fallbackPublishTransactionEvent")
+    @CircuitBreaker(name = "banking-service")
+    public CompletableFuture<SendResult<String, Object>> publishTransactionEvent(TransactionEvent event) {
+        logger.info("Publicando evento de transação com retry: {}", event.getEventId());
+        
+        return kafkaTemplate.send(KafkaConfig.TRANSACTION_TOPIC, event.getEventId(), event)
+                .whenComplete((result, exception) -> {
+                    if (exception == null) {
+                        logger.info("Evento de transação publicado com sucesso: {} no offset: {}", 
+                                   event.getEventId(), result.getRecordMetadata().offset());
+                    } else {
+                        logger.error("Falha ao publicar evento de transação: {}", exception.getMessage());
+                    }
+                });
     }
     
-    public void publishNotificationEvent(NotificationEvent event) {
-        try {
-            logger.info("Publicando evento de notificação: {}", event.getEventId());
-            kafkaTemplate.send(KafkaConfig.NOTIFICATION_TOPIC, event.getEventId(), event);
-        } catch (Exception e) {
-            logger.error("Erro ao publicar evento de notificação: {}", e.getMessage(), e);
-        }
+    @Retry(name = "banking-service", fallbackMethod = "fallbackPublishNotificationEvent")
+    @CircuitBreaker(name = "banking-service")
+    public CompletableFuture<SendResult<String, Object>> publishNotificationEvent(NotificationEvent event) {
+        logger.info("Publicando evento de notificação com retry: {}", event.getEventId());
+        
+        return kafkaTemplate.send(KafkaConfig.NOTIFICATION_TOPIC, event.getEventId(), event)
+                .whenComplete((result, exception) -> {
+                    if (exception == null) {
+                        logger.info("Evento de notificação publicado com sucesso: {} no offset: {}", 
+                                   event.getEventId(), result.getRecordMetadata().offset());
+                    } else {
+                        logger.error("Falha ao publicar evento de notificação: {}", exception.getMessage());
+                    }
+                });
     }
     
-    public void publishAuditEvent(TransactionEvent event) {
-        try {
-            logger.info("Publicando evento de auditoria: {}", event.getEventId());
-            kafkaTemplate.send(KafkaConfig.AUDIT_TOPIC, event.getEventId(), event);
-        } catch (Exception e) {
-            logger.error("Erro ao publicar evento de auditoria: {}", e.getMessage(), e);
-        }
+    @Retry(name = "banking-service", fallbackMethod = "fallbackPublishAuditEvent")
+    @CircuitBreaker(name = "banking-service")
+    public CompletableFuture<SendResult<String, Object>> publishAuditEvent(TransactionEvent event) {
+        logger.info("Publicando evento de auditoria com retry: {}", event.getEventId());
+        
+        return kafkaTemplate.send(KafkaConfig.AUDIT_TOPIC, event.getEventId(), event)
+                .whenComplete((result, exception) -> {
+                    if (exception == null) {
+                        logger.info("Evento de auditoria publicado com sucesso: {} no offset: {}", 
+                                   event.getEventId(), result.getRecordMetadata().offset());
+                    } else {
+                        logger.error("Falha ao publicar evento de auditoria: {}", exception.getMessage());
+                    }
+                });
+    }
+    
+    // Métodos de fallback
+    public CompletableFuture<SendResult<String, Object>> fallbackPublishTransactionEvent(TransactionEvent event, Exception ex) {
+        logger.error("Fallback ativado para evento de transação: {} - Erro: {}", event.getEventId(), ex.getMessage());
+        // Em um cenário real, poderia tentar um mecanismo alternativo ou armazenar em DLQ
+        return CompletableFuture.failedFuture(new RuntimeException("Falha ao publicar evento após múltiplas tentativas"));
+    }
+    
+    public CompletableFuture<SendResult<String, Object>> fallbackPublishNotificationEvent(NotificationEvent event, Exception ex) {
+        logger.error("Fallback ativado para evento de notificação: {} - Erro: {}", event.getEventId(), ex.getMessage());
+        return CompletableFuture.failedFuture(new RuntimeException("Falha ao publicar evento após múltiplas tentativas"));
+    }
+    
+    public CompletableFuture<SendResult<String, Object>> fallbackPublishAuditEvent(TransactionEvent event, Exception ex) {
+        logger.error("Fallback ativado para evento de auditoria: {} - Erro: {}", event.getEventId(), ex.getMessage());
+        return CompletableFuture.failedFuture(new RuntimeException("Falha ao publicar evento após múltiplas tentativas"));
     }
 }

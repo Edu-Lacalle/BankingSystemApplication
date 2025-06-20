@@ -1,10 +1,14 @@
 package com.bank.BankingSystemApplication.service;
 
+import com.bank.BankingSystemApplication.audit.BankingAuditService;
 import com.bank.BankingSystemApplication.dto.*;
 import com.bank.BankingSystemApplication.entity.Account;
+import com.bank.BankingSystemApplication.metrics.BankingMetricsService;
 import com.bank.BankingSystemApplication.service.kafka.TransactionEventProducer;
+import io.micrometer.core.instrument.Timer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -21,7 +25,20 @@ public class AsyncAccountService {
     @Autowired
     private TransactionEventProducer eventProducer;
     
+    @Autowired
+    private BankingMetricsService metricsService;
+    
+    @Autowired
+    private BankingAuditService auditService;
+    
     public Account createAccountAsync(AccountCreationRequest request) {
+        String correlationId = UUID.randomUUID().toString();
+        MDC.put("correlationId", correlationId);
+        MDC.put("operation", "createAccountAsync");
+        MDC.put("cpf", request.getCpf().substring(0, 3) + "*****" + request.getCpf().substring(8));
+        
+        Timer.Sample kafkaPublishSample = metricsService.startKafkaPublishTimer();
+        
         try {
             // Criar conta de forma síncrona
             Account account = accountService.createAccount(request);
@@ -38,7 +55,19 @@ public class AsyncAccountService {
                 Status.EFETUADO,
                 "Conta criada com sucesso"
             );
-            eventProducer.publishAuditEvent(auditEvent);
+            // Publicar evento de auditoria de forma assíncrona
+            eventProducer.publishAuditEvent(auditEvent)
+                    .exceptionally(throwable -> {
+                        logger.error("Erro ao publicar evento de auditoria para conta {}: {}", 
+                                   account.getId(), throwable.getMessage());
+                        auditService.auditKafkaEvent("account-audit", "AUDIT_EVENT", eventId, 
+                                                    false, "Erro: " + throwable.getMessage());
+                        return null;
+                    })
+                    .thenRun(() -> {
+                        auditService.auditKafkaEvent("account-audit", "AUDIT_EVENT", eventId, 
+                                                    true, "Evento de auditoria publicado com sucesso");
+                    });
             
             // Evento de notificação (se email estiver presente)
             if (account.getEmail() != null && !account.getEmail().isEmpty()) {
@@ -49,19 +78,44 @@ public class AsyncAccountService {
                     "Bem-vindo(a) ao nosso banco! Sua conta foi criada com sucesso.",
                     NotificationType.ACCOUNT_CREATED
                 );
-                eventProducer.publishNotificationEvent(notificationEvent);
+                // Publicar evento de notificação de forma assíncrona
+                eventProducer.publishNotificationEvent(notificationEvent)
+                        .exceptionally(throwable -> {
+                            logger.error("Erro ao publicar evento de notificação para conta {}: {}", 
+                                       account.getId(), throwable.getMessage());
+                            auditService.auditKafkaEvent("notifications", "NOTIFICATION_EVENT", eventId, 
+                                                        false, "Erro: " + throwable.getMessage());
+                            return null;
+                        })
+                        .thenRun(() -> {
+                            auditService.auditKafkaEvent("notifications", "NOTIFICATION_EVENT", eventId, 
+                                                        true, "Evento de notificação publicado com sucesso");
+                        });
             }
             
+            metricsService.recordKafkaPublishTime(kafkaPublishSample);
             logger.info("Conta criada e eventos publicados para ID: {}", account.getId());
             return account;
             
         } catch (Exception e) {
+            metricsService.recordKafkaPublishTime(kafkaPublishSample);
+            auditService.auditSystemFailure("AsyncAccountService", "createAccountAsync", 
+                                           e.getMessage(), e.getStackTrace().toString(), correlationId);
             logger.error("Erro ao criar conta de forma assíncrona: {}", e.getMessage(), e);
             throw e;
+        } finally {
+            MDC.clear();
         }
     }
     
     public TransactionResponse creditAsync(TransactionRequest request) {
+        String correlationId = UUID.randomUUID().toString();
+        MDC.put("correlationId", correlationId);
+        MDC.put("operation", "creditAsync");
+        MDC.put("accountId", String.valueOf(request.getAccountId()));
+        
+        Timer.Sample kafkaPublishSample = metricsService.startKafkaPublishTimer();
+        
         try {
             // Executar transação síncrona
             TransactionResponse response = accountService.credit(request);
@@ -79,10 +133,24 @@ public class AsyncAccountService {
             );
             
             // Publicar evento de transação
-            eventProducer.publishTransactionEvent(transactionEvent);
+            eventProducer.publishTransactionEvent(transactionEvent)
+                    .exceptionally(throwable -> {
+                        auditService.auditKafkaEvent("transactions", "TRANSACTION_EVENT", eventId, 
+                                                    false, "Erro: " + throwable.getMessage());
+                        return null;
+                    })
+                    .thenRun(() -> {
+                        auditService.auditKafkaEvent("transactions", "TRANSACTION_EVENT", eventId, 
+                                                    true, "Evento de transação publicado com sucesso");
+                    });
             
             // Publicar evento de auditoria
-            eventProducer.publishAuditEvent(transactionEvent);
+            eventProducer.publishAuditEvent(transactionEvent)
+                    .exceptionally(throwable -> {
+                        auditService.auditKafkaEvent("account-audit", "AUDIT_EVENT", eventId, 
+                                                    false, "Erro: " + throwable.getMessage());
+                        return null;
+                    });
             
             // Publicar notificação se transação foi bem-sucedida
             if (response.getStatus() == Status.EFETUADO) {
@@ -96,20 +164,38 @@ public class AsyncAccountService {
                                      request.getAmount(), account.getBalance()),
                         NotificationType.TRANSACTION_SUCCESS
                     );
-                    eventProducer.publishNotificationEvent(notificationEvent);
+                    eventProducer.publishNotificationEvent(notificationEvent)
+                            .exceptionally(throwable -> {
+                                auditService.auditKafkaEvent("notifications", "NOTIFICATION_EVENT", eventId, 
+                                                            false, "Erro: " + throwable.getMessage());
+                                return null;
+                            });
                 }
             }
             
+            metricsService.recordKafkaPublishTime(kafkaPublishSample);
             logger.info("Crédito processado e eventos publicados para conta: {}", request.getAccountId());
             return response;
             
         } catch (Exception e) {
+            metricsService.recordKafkaPublishTime(kafkaPublishSample);
+            auditService.auditSystemFailure("AsyncAccountService", "creditAsync", 
+                                           e.getMessage(), e.getStackTrace().toString(), correlationId);
             logger.error("Erro ao processar crédito assíncrono: {}", e.getMessage(), e);
             throw e;
+        } finally {
+            MDC.clear();
         }
     }
     
     public TransactionResponse debitAsync(TransactionRequest request) {
+        String correlationId = UUID.randomUUID().toString();
+        MDC.put("correlationId", correlationId);
+        MDC.put("operation", "debitAsync");
+        MDC.put("accountId", String.valueOf(request.getAccountId()));
+        
+        Timer.Sample kafkaPublishSample = metricsService.startKafkaPublishTimer();
+        
         try {
             // Executar transação síncrona
             TransactionResponse response = accountService.debit(request);
@@ -127,10 +213,24 @@ public class AsyncAccountService {
             );
             
             // Publicar evento de transação
-            eventProducer.publishTransactionEvent(transactionEvent);
+            eventProducer.publishTransactionEvent(transactionEvent)
+                    .exceptionally(throwable -> {
+                        auditService.auditKafkaEvent("transactions", "TRANSACTION_EVENT", eventId, 
+                                                    false, "Erro: " + throwable.getMessage());
+                        return null;
+                    })
+                    .thenRun(() -> {
+                        auditService.auditKafkaEvent("transactions", "TRANSACTION_EVENT", eventId, 
+                                                    true, "Evento de transação publicado com sucesso");
+                    });
             
             // Publicar evento de auditoria
-            eventProducer.publishAuditEvent(transactionEvent);
+            eventProducer.publishAuditEvent(transactionEvent)
+                    .exceptionally(throwable -> {
+                        auditService.auditKafkaEvent("account-audit", "AUDIT_EVENT", eventId, 
+                                                    false, "Erro: " + throwable.getMessage());
+                        return null;
+                    });
             
             // Publicar notificação
             Account account = accountService.getAccountById(request.getAccountId());
@@ -144,7 +244,12 @@ public class AsyncAccountService {
                                      request.getAmount(), account.getBalance()),
                         NotificationType.TRANSACTION_SUCCESS
                     );
-                    eventProducer.publishNotificationEvent(notificationEvent);
+                    eventProducer.publishNotificationEvent(notificationEvent)
+                            .exceptionally(throwable -> {
+                                auditService.auditKafkaEvent("notifications", "NOTIFICATION_EVENT", eventId, 
+                                                            false, "Erro: " + throwable.getMessage());
+                                return null;
+                            });
                 } else {
                     NotificationEvent notificationEvent = new NotificationEvent(
                         eventId,
@@ -154,16 +259,27 @@ public class AsyncAccountService {
                                      request.getAmount(), response.getMessage()),
                         NotificationType.TRANSACTION_FAILED
                     );
-                    eventProducer.publishNotificationEvent(notificationEvent);
+                    eventProducer.publishNotificationEvent(notificationEvent)
+                            .exceptionally(throwable -> {
+                                auditService.auditKafkaEvent("notifications", "NOTIFICATION_EVENT", eventId, 
+                                                            false, "Erro: " + throwable.getMessage());
+                                return null;
+                            });
                 }
             }
             
+            metricsService.recordKafkaPublishTime(kafkaPublishSample);
             logger.info("Débito processado e eventos publicados para conta: {}", request.getAccountId());
             return response;
             
         } catch (Exception e) {
+            metricsService.recordKafkaPublishTime(kafkaPublishSample);
+            auditService.auditSystemFailure("AsyncAccountService", "debitAsync", 
+                                           e.getMessage(), e.getStackTrace().toString(), correlationId);
             logger.error("Erro ao processar débito assíncrono: {}", e.getMessage(), e);
             throw e;
+        } finally {
+            MDC.clear();
         }
     }
 }
