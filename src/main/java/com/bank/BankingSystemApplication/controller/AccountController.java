@@ -19,6 +19,31 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 
+/**
+ * Controller REST para operações bancárias básicas.
+ * 
+ * Este controller expõe endpoints para:
+ * - Criação de contas bancárias
+ * - Operações de crédito
+ * - Operações de débito
+ * - Consulta de contas
+ * 
+ * Características:
+ * - Validação automática de dados de entrada
+ * - Tratamento de exceções com códigos HTTP apropriados
+ * - Documentação OpenAPI/Swagger integrada
+ * - Respostas padronizadas com status HTTP
+ * 
+ * Endpoints disponíveis:
+ * - POST /api/accounts - Criar conta
+ * - POST /api/accounts/credit - Creditar valor
+ * - POST /api/accounts/debit - Debitar valor
+ * - GET /api/accounts/{id} - Consultar conta
+ * 
+ * @author Sistema Bancário
+ * @version 1.0
+ * @since 1.0
+ */
 @RestController
 @RequestMapping("/api/accounts")
 @Validated

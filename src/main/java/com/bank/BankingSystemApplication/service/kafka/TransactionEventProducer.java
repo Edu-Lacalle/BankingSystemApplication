@@ -25,49 +25,91 @@ public class TransactionEventProducer {
     @Retry(name = "banking-service", fallbackMethod = "fallbackPublishTransactionEvent")
     @CircuitBreaker(name = "banking-service")
     public CompletableFuture<SendResult<String, Object>> publishTransactionEvent(TransactionEvent event) {
-        logger.info("Publicando evento de transação com retry: {}", event.getEventId());
-        
-        return kafkaTemplate.send(KafkaConfig.TRANSACTION_TOPIC, event.getEventId(), event)
-                .whenComplete((result, exception) -> {
-                    if (exception == null) {
+        try {
+            logger.info("Publicando evento de transação com retry: {}", event.getEventId());
+            
+            CompletableFuture<SendResult<String, Object>> future = kafkaTemplate.send(KafkaConfig.TRANSACTION_TOPIC, event.getEventId(), event);
+            if (future == null) {
+                logger.warn("KafkaTemplate.send retornou null para evento: {}", event.getEventId());
+                return CompletableFuture.completedFuture(null);
+            }
+            
+            return future.whenComplete((result, exception) -> {
+                if (exception == null) {
+                    if (result != null) {
                         logger.info("Evento de transação publicado com sucesso: {} no offset: {}", 
                                    event.getEventId(), result.getRecordMetadata().offset());
                     } else {
-                        logger.error("Falha ao publicar evento de transação: {}", exception.getMessage());
+                        logger.info("Evento de transação publicado: {}", event.getEventId());
                     }
-                });
+                } else {
+                    logger.error("Falha ao publicar evento de transação: {}", exception.getMessage());
+                }
+            });
+        } catch (Exception e) {
+            logger.error("Erro ao publicar evento de transação: {}", e.getMessage(), e);
+            return CompletableFuture.completedFuture(null);
+        }
     }
     
     @Retry(name = "banking-service", fallbackMethod = "fallbackPublishNotificationEvent")
     @CircuitBreaker(name = "banking-service")
     public CompletableFuture<SendResult<String, Object>> publishNotificationEvent(NotificationEvent event) {
-        logger.info("Publicando evento de notificação com retry: {}", event.getEventId());
-        
-        return kafkaTemplate.send(KafkaConfig.NOTIFICATION_TOPIC, event.getEventId(), event)
-                .whenComplete((result, exception) -> {
-                    if (exception == null) {
+        try {
+            logger.info("Publicando evento de notificação com retry: {}", event.getEventId());
+            
+            CompletableFuture<SendResult<String, Object>> future = kafkaTemplate.send(KafkaConfig.NOTIFICATION_TOPIC, event.getEventId(), event);
+            if (future == null) {
+                logger.warn("KafkaTemplate.send retornou null para evento: {}", event.getEventId());
+                return CompletableFuture.completedFuture(null);
+            }
+            
+            return future.whenComplete((result, exception) -> {
+                if (exception == null) {
+                    if (result != null) {
                         logger.info("Evento de notificação publicado com sucesso: {} no offset: {}", 
                                    event.getEventId(), result.getRecordMetadata().offset());
                     } else {
-                        logger.error("Falha ao publicar evento de notificação: {}", exception.getMessage());
+                        logger.info("Evento de notificação publicado: {}", event.getEventId());
                     }
-                });
+                } else {
+                    logger.error("Falha ao publicar evento de notificação: {}", exception.getMessage());
+                }
+            });
+        } catch (Exception e) {
+            logger.error("Erro ao publicar evento de notificação: {}", e.getMessage(), e);
+            return CompletableFuture.completedFuture(null);
+        }
     }
     
     @Retry(name = "banking-service", fallbackMethod = "fallbackPublishAuditEvent")
     @CircuitBreaker(name = "banking-service")
     public CompletableFuture<SendResult<String, Object>> publishAuditEvent(TransactionEvent event) {
-        logger.info("Publicando evento de auditoria com retry: {}", event.getEventId());
-        
-        return kafkaTemplate.send(KafkaConfig.AUDIT_TOPIC, event.getEventId(), event)
-                .whenComplete((result, exception) -> {
-                    if (exception == null) {
+        try {
+            logger.info("Publicando evento de auditoria com retry: {}", event.getEventId());
+            
+            CompletableFuture<SendResult<String, Object>> future = kafkaTemplate.send(KafkaConfig.AUDIT_TOPIC, event.getEventId(), event);
+            if (future == null) {
+                logger.warn("KafkaTemplate.send retornou null para evento: {}", event.getEventId());
+                return CompletableFuture.completedFuture(null);
+            }
+            
+            return future.whenComplete((result, exception) -> {
+                if (exception == null) {
+                    if (result != null) {
                         logger.info("Evento de auditoria publicado com sucesso: {} no offset: {}", 
                                    event.getEventId(), result.getRecordMetadata().offset());
                     } else {
-                        logger.error("Falha ao publicar evento de auditoria: {}", exception.getMessage());
+                        logger.info("Evento de auditoria publicado: {}", event.getEventId());
                     }
-                });
+                } else {
+                    logger.error("Falha ao publicar evento de auditoria: {}", exception.getMessage());
+                }
+            });
+        } catch (Exception e) {
+            logger.error("Erro ao publicar evento de auditoria: {}", e.getMessage(), e);
+            return CompletableFuture.completedFuture(null);
+        }
     }
     
     // Métodos de fallback

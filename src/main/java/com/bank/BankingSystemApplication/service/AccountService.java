@@ -21,6 +21,29 @@ import java.time.LocalDate;
 import java.time.Period;
 import java.util.UUID;
 
+/**
+ * Serviço principal para operações bancárias.
+ * 
+ * Esta classe implementa a lógica de negócio para:
+ * - Criação de contas bancárias
+ * - Operações de crédito e débito
+ * - Validações de regras de negócio
+ * - Logging e auditoria completos
+ * - Métricas de performance e observabilidade
+ * 
+ * Características importantes:
+ * - Transações atômicas com @Transactional
+ * - Controle de concorrência com lock pessimista
+ * - Logging estruturado com MDC (Mapped Diagnostic Context)
+ * - Métricas de tempo de execução e contadores
+ * - Auditoria completa de todas as operações
+ * - Validação de idade mínima (18 anos)
+ * - Verificação de saldo antes de débitos
+ * 
+ * @author Sistema Bancário
+ * @version 1.0
+ * @since 1.0
+ */
 @Service
 public class AccountService {
     
@@ -35,6 +58,18 @@ public class AccountService {
     @Autowired
     private BankingAuditService auditService;
     
+    /**
+     * Cria uma nova conta bancária no sistema.
+     * 
+     * Validações realizadas:
+     * - Idade mínima de 18 anos
+     * - CPF único no sistema
+     * - Dados obrigatórios preenchidos
+     * 
+     * @param request Dados para criação da conta
+     * @return Account Conta criada com ID gerado
+     * @throws IllegalArgumentException Se CPF já existe ou idade < 18 anos
+     */
     @Transactional
     public Account createAccount(AccountCreationRequest request) {
         String correlationId = UUID.randomUUID().toString();
@@ -87,6 +122,16 @@ public class AccountService {
         }
     }
     
+    /**
+     * Realiza operação de crédito em uma conta.
+     * 
+     * Adiciona o valor especificado ao saldo da conta.
+     * Operação sempre aprovada se a conta existir.
+     * 
+     * @param request Dados da transação (ID da conta e valor)
+     * @return TransactionResponse Status da operação (EFETUADO/RECUSADO)
+     * @throws IllegalArgumentException Se a conta não for encontrada
+     */
     @Transactional
     public TransactionResponse credit(TransactionRequest request) {
         String correlationId = UUID.randomUUID().toString();
@@ -138,6 +183,16 @@ public class AccountService {
         }
     }
     
+    /**
+     * Realiza operação de débito em uma conta.
+     * 
+     * Subtrai o valor especificado do saldo da conta.
+     * Operação recusada se saldo insuficiente.
+     * 
+     * @param request Dados da transação (ID da conta e valor)
+     * @return TransactionResponse Status da operação (EFETUADO/RECUSADO)
+     * @throws IllegalArgumentException Se a conta não for encontrada
+     */
     @Transactional
     public TransactionResponse debit(TransactionRequest request) {
         String correlationId = UUID.randomUUID().toString();
@@ -204,6 +259,12 @@ public class AccountService {
         }
     }
     
+    /**
+     * Valida se o titular tem idade mínima para abrir conta.
+     * 
+     * @param birthDate Data de nascimento do titular
+     * @throws IllegalArgumentException Se idade < 18 anos
+     */
     private void validateAge(LocalDate birthDate) {
         int age = Period.between(birthDate, LocalDate.now()).getYears();
         if (age < 18) {
@@ -211,6 +272,13 @@ public class AccountService {
         }
     }
     
+    /**
+     * Busca uma conta pelo ID.
+     * 
+     * @param id ID da conta
+     * @return Account Dados da conta
+     * @throws IllegalArgumentException Se a conta não for encontrada
+     */
     public Account getAccountById(Long id) {
         return accountRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Conta não encontrada"));

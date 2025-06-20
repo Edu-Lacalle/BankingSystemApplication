@@ -11,7 +11,34 @@ import java.math.BigDecimal;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
- * Serviço de métricas customizadas para o sistema bancário
+ * Serviço de métricas customizadas para observabilidade do sistema bancário.
+ * 
+ * Esta classe coleta e expõe métricas de performance e negócio usando Micrometer:
+ * 
+ * Contadores (Counters):
+ * - Contas criadas
+ * - Transações executadas (sucesso/falha)
+ * - Operações de crédito/débito
+ * - Transferências e status de Sagas
+ * 
+ * Temporizadores (Timers):
+ * - Tempo de criação de contas
+ * - Tempo de processamento de transações
+ * - Tempo de publicação no Kafka
+ * - Tempo de execução de Sagas
+ * 
+ * Medidores (Gauges):
+ * - Contas ativas no momento
+ * - Saldo total do sistema
+ * - Transações ativas
+ * - Sagas em execução
+ * 
+ * As métricas são automaticamente expostas via Actuator/Prometheus
+ * para monitoramento com ferramentas como Grafana.
+ * 
+ * @author Sistema Bancário
+ * @version 1.0
+ * @since 1.0
  */
 @Service
 public class BankingMetricsService {
@@ -96,21 +123,21 @@ public class BankingMetricsService {
                 .register(meterRegistry);
         
         // Inicializar gauges
-        Gauge.builder("banking.accounts.active")
+        Gauge.builder("banking.accounts.active", activeAccountsGauge, AtomicLong::get)
                 .description("Número de contas ativas")
-                .register(meterRegistry, activeAccountsGauge, AtomicLong::get);
+                .register(meterRegistry);
                 
-        Gauge.builder("banking.balance.total")
+        Gauge.builder("banking.balance.total", totalBalanceGauge, AtomicLong::get)
                 .description("Saldo total do sistema")
-                .register(meterRegistry, totalBalanceGauge, AtomicLong::get);
+                .register(meterRegistry);
                 
-        Gauge.builder("banking.transactions.active")
+        Gauge.builder("banking.transactions.active", activeTransactionsGauge, AtomicLong::get)
                 .description("Número de transações ativas")
-                .register(meterRegistry, activeTransactionsGauge, AtomicLong::get);
+                .register(meterRegistry);
                 
-        Gauge.builder("banking.saga.active")
+        Gauge.builder("banking.saga.active", activeSagasGauge, AtomicLong::get)
                 .description("Número de sagas ativas")
-                .register(meterRegistry, activeSagasGauge, AtomicLong::get);
+                .register(meterRegistry);
     }
     
     // Métodos para incrementar contadores

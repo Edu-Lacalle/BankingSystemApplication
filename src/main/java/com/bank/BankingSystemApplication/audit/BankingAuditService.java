@@ -13,7 +13,34 @@ import java.util.Map;
 import java.util.UUID;
 
 /**
- * Serviço de auditoria para operações bancárias
+ * Serviço de auditoria para operações bancárias.
+ * 
+ * Este serviço é responsável por registrar todos os eventos críticos 
+ * do sistema bancário para fins de:
+ * - Conformidade regulatória
+ * - Investigação de incidentes
+ * - Análise de segurança
+ * - Rastreabilidade de operações
+ * 
+ * Tipos de eventos auditados:
+ * - Criação de contas
+ * - Transações financeiras (crédito/débito)
+ * - Transferências via Saga
+ * - Eventos de segurança
+ * - Falhas de sistema
+ * - Operações de Circuit Breaker
+ * - Eventos Kafka
+ * 
+ * Características de segurança:
+ * - Mascaramento de dados sensíveis (CPF)
+ * - Logs estruturados em JSON
+ * - Correlation IDs para rastreamento
+ * - Timestamps precisos
+ * - Logging separado para auditoria
+ * 
+ * @author Sistema Bancário
+ * @version 1.0
+ * @since 1.0
  */
 @Service
 public class BankingAuditService {
