@@ -1,8 +1,8 @@
-package com.bank.BankingSystemApplication.controller;
+package com.bank.BankingSystemApplication.adapter.in.web;
 
-import com.bank.BankingSystemApplication.dto.*;
-import com.bank.BankingSystemApplication.entity.Account;
-import com.bank.BankingSystemApplication.service.AsyncAccountService;
+import com.bank.BankingSystemApplication.domain.model.*;
+import com.bank.BankingSystemApplication.domain.model.Account;
+import com.bank.BankingSystemApplication.application.service.AsyncAccountService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -22,7 +22,10 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @WebMvcTest(controllers = AsyncAccountController.class)
-@TestPropertySource(properties = "spring.autoconfigure.exclude=org.springframework.boot.autoconfigure.kafka.KafkaAutoConfiguration")
+@TestPropertySource(properties = {
+    "spring.autoconfigure.exclude=org.springframework.boot.autoconfigure.kafka.KafkaAutoConfiguration",
+    "performance.monitoring.enabled=false"
+})
 class AsyncAccountControllerTest {
 
     @Autowired

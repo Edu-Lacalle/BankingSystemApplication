@@ -1,8 +1,10 @@
-package com.bank.BankingSystemApplication.service;
+package com.bank.BankingSystemApplication.application.service;
 
-import com.bank.BankingSystemApplication.dto.*;
-import com.bank.BankingSystemApplication.entity.Account;
-import com.bank.BankingSystemApplication.service.kafka.TransactionEventProducer;
+import com.bank.BankingSystemApplication.domain.model.*;
+import com.bank.BankingSystemApplication.domain.model.Account;
+import com.bank.BankingSystemApplication.application.service.kafka.TransactionEventProducer;
+import com.bank.BankingSystemApplication.application.service.AccountService;
+import com.bank.BankingSystemApplication.application.service.AsyncAccountService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;

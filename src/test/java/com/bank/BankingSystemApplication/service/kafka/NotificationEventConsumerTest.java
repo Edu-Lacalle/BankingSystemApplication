@@ -1,7 +1,8 @@
-package com.bank.BankingSystemApplication.service.kafka;
+package com.bank.BankingSystemApplication.application.service.kafka;
 
-import com.bank.BankingSystemApplication.dto.NotificationEvent;
-import com.bank.BankingSystemApplication.dto.NotificationType;
+import com.bank.BankingSystemApplication.domain.model.NotificationEvent;
+import com.bank.BankingSystemApplication.domain.model.NotificationType;
+import com.bank.BankingSystemApplication.application.service.kafka.NotificationEventConsumer;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;

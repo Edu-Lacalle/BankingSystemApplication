@@ -1,10 +1,11 @@
-package com.bank.BankingSystemApplication.service;
+package com.bank.BankingSystemApplication.application.service;
 
-import com.bank.BankingSystemApplication.dto.AccountCreationRequest;
-import com.bank.BankingSystemApplication.dto.Status;
-import com.bank.BankingSystemApplication.dto.TransactionRequest;
-import com.bank.BankingSystemApplication.dto.TransactionResponse;
-import com.bank.BankingSystemApplication.entity.Account;
+import com.bank.BankingSystemApplication.domain.model.AccountCreationRequest;
+import com.bank.BankingSystemApplication.domain.model.Status;
+import com.bank.BankingSystemApplication.domain.model.TransactionRequest;
+import com.bank.BankingSystemApplication.domain.model.TransactionResponse;
+import com.bank.BankingSystemApplication.domain.model.Account;
+import com.bank.BankingSystemApplication.application.service.AccountService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;

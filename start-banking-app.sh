@@ -29,8 +29,15 @@ echo "Container status:"
 docker-compose ps
 
 # Show application logs
+echo "Waiting for banking application to start (60 seconds)..."
+sleep 60
+
 echo "Banking application logs:"
-docker-compose logs banking-app
+docker-compose logs --tail=50 banking-app
+
+echo ""
+echo "Checking application health..."
+curl -f http://localhost:8080/actuator/health 2>/dev/null && echo "✅ Application is healthy!" || echo "⚠️ Application might still be starting..."
 
 echo ""
 echo "Services started successfully!"

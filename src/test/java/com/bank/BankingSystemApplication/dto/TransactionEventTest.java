@@ -1,4 +1,4 @@
-package com.bank.BankingSystemApplication.dto;
+package com.bank.BankingSystemApplication.domain.model;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

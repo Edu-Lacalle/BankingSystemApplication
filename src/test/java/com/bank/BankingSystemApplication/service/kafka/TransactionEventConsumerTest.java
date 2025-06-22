@@ -1,6 +1,7 @@
-package com.bank.BankingSystemApplication.service.kafka;
+package com.bank.BankingSystemApplication.application.service.kafka;
 
-import com.bank.BankingSystemApplication.dto.*;
+import com.bank.BankingSystemApplication.domain.model.*;
+import com.bank.BankingSystemApplication.application.service.kafka.TransactionEventConsumer;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
