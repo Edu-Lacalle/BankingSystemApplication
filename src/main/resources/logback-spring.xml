@@ -112,6 +112,36 @@
         </encoder>
     </appender>
     
+    <!-- Datadog Log Appender -->
+    <springProfile name="production,datadog">
+        <appender name="DATADOG" class="ch.qos.logback.core.ConsoleAppender">
+            <encoder class="net.logstash.logback.encoder.LoggingEventCompositeJsonEncoder">
+                <providers>
+                    <timestamp/>
+                    <logLevel/>
+                    <loggerName/>
+                    <mdc/>
+                    <arguments/>
+                    <message/>
+                    <stackTrace/>
+                    <pattern>
+                        <pattern>
+                            {
+                                "dd.service": "${APP_NAME}",
+                                "dd.env": "${DD_ENV:-${SPRING_PROFILES_ACTIVE:-default}}",
+                                "dd.version": "${DD_VERSION:-1.0.0}",
+                                "dd.trace_id": "%X{dd.trace_id:-}",
+                                "dd.span_id": "%X{dd.span_id:-}",
+                                "application": "${APP_NAME}",
+                                "environment": "${DD_ENV:-${SPRING_PROFILES_ACTIVE:-default}}"
+                            }
+                        </pattern>
+                    </pattern>
+                </providers>
+            </encoder>
+        </appender>
+    </springProfile>
+    
     <!-- Logger específico para auditoria -->
     <logger name="com.bank.BankingSystemApplication.audit" level="INFO" additivity="false">
         <appender-ref ref="AUDIT"/>
@@ -147,6 +177,18 @@
         <logger name="io.github.resilience4j" level="INFO"/>
         <logger name="org.hibernate.SQL" level="WARN"/>
         <logger name="org.springframework.web" level="WARN"/>
+    </springProfile>
+    
+    <springProfile name="datadog">
+        <root level="${LOG_LEVEL}">
+            <appender-ref ref="DATADOG"/>
+            <appender-ref ref="FILE"/>
+        </root>
+        
+        <!-- Configuração para Datadog -->
+        <logger name="com.bank.BankingSystemApplication" level="INFO"/>
+        <logger name="org.springframework.kafka" level="WARN"/>
+        <logger name="io.github.resilience4j" level="INFO"/>
     </springProfile>
     
     <!-- Configuração para testes -->
