@@ -13,6 +13,11 @@ public class SystemLoadMonitor {
     private final OperatingSystemMXBean osBean;
     private final AtomicInteger activeConnections = new AtomicInteger(0);
     
+    // CPU usage cache to avoid expensive calls
+    private volatile double cachedCpuUsage = 0.0;
+    private volatile long lastCpuUpdate = 0;
+    private static final long CPU_CACHE_DURATION_MS = 1000; // Cache for 1 second
+    
     @Value("${app.load.cpu-threshold:70.0}")
     private double cpuThreshold;
     
@@ -24,7 +29,12 @@ public class SystemLoadMonitor {
     }
     
     public double getCurrentCpuUsage() {
-        return osBean.getProcessCpuLoad() * 100;
+        long now = System.currentTimeMillis();
+        if (now - lastCpuUpdate > CPU_CACHE_DURATION_MS) {
+            cachedCpuUsage = osBean.getProcessCpuLoad() * 100;
+            lastCpuUpdate = now;
+        }
+        return cachedCpuUsage;
     }
     
     public int getActiveConnections() {

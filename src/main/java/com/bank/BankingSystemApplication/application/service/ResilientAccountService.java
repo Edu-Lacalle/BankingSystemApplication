@@ -56,13 +56,13 @@ public class ResilientAccountService {
             Timer.Sample sample = metricsService.startAccountCreationTimer();
             
             try {
-                // Simula possível latência ou falha
-                if (Math.random() > 0.7) { // 30% de chance de falha para demonstrar o pattern
-                    logger.warn("Simulando falha temporária na criação de conta");
-                    auditService.auditCircuitBreakerEvent("banking-service", "FAILURE_SIMULATION", 
-                                                         "createAccountResilient", "Falha temporária simulada");
-                    throw new RuntimeException("Falha temporária no sistema");
-                }
+                // Simulação de falhas desabilitada para melhor performance
+                // if (Math.random() > 0.7) { // 30% de chance de falha para demonstrar o pattern
+                //     logger.warn("Simulando falha temporária na criação de conta");
+                //     auditService.auditCircuitBreakerEvent("banking-service", "FAILURE_SIMULATION", 
+                //                                          "createAccountResilient", "Falha temporária simulada");
+                //     throw new RuntimeException("Falha temporária no sistema");
+                // }
                 
                 Account account = accountService.createAccount(request);
                 
@@ -102,13 +102,13 @@ public class ResilientAccountService {
         Timer.Sample sample = metricsService.startTransactionTimer();
         
         try {
-            // Simula possível latência
-            if (Math.random() > 0.8) { // 20% de chance de falha
-                logger.warn("Simulando falha temporária na operação de crédito");
-                auditService.auditCircuitBreakerEvent("banking-service", "FAILURE_SIMULATION", 
-                                                     "creditResilient", "Falha temporária simulada");
-                throw new RuntimeException("Falha temporária no sistema de pagamento");
-            }
+            // Simulação de falhas desabilitada para melhor performance
+            // if (Math.random() > 0.8) { // 20% de chance de falha
+            //     logger.warn("Simulando falha temporária na operação de crédito");
+            //     auditService.auditCircuitBreakerEvent("banking-service", "FAILURE_SIMULATION", 
+            //                                          "creditResilient", "Falha temporária simulada");
+            //     throw new RuntimeException("Falha temporária no sistema de pagamento");
+            // }
             
             TransactionResponse response = accountService.credit(request);
             
@@ -147,13 +147,13 @@ public class ResilientAccountService {
         Timer.Sample sample = metricsService.startTransactionTimer();
         
         try {
-            // Simula possível latência
-            if (Math.random() > 0.8) { // 20% de chance de falha
-                logger.warn("Simulando falha temporária na operação de débito");
-                auditService.auditCircuitBreakerEvent("banking-service", "FAILURE_SIMULATION", 
-                                                     "debitResilient", "Falha temporária simulada");
-                throw new RuntimeException("Falha temporária no sistema de pagamento");
-            }
+            // Simulação de falhas desabilitada para melhor performance
+            // if (Math.random() > 0.8) { // 20% de chance de falha
+            //     logger.warn("Simulando falha temporária na operação de débito");
+            //     auditService.auditCircuitBreakerEvent("banking-service", "FAILURE_SIMULATION", 
+            //                                          "debitResilient", "Falha temporária simulada");
+            //     throw new RuntimeException("Falha temporária no sistema de pagamento");
+            // }
             
             TransactionResponse response = accountService.debit(request);
             

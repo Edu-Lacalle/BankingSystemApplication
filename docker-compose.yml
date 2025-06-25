@@ -74,7 +74,7 @@ services:
       - "8080:8080"
       - "8083:8081"
     environment:
-      - SPRING_PROFILES_ACTIVE=production
+      - SPRING_PROFILES_ACTIVE=datadog
       - DATABASE_URL=jdbc:postgresql://postgres:5432/banking_system
       - DATABASE_USERNAME=banking_user
       - DATABASE_PASSWORD=banking_password
@@ -83,6 +83,22 @@ services:
       - APP_VERSION=1.0.0
       - APP_ENVIRONMENT=docker
       - ZIPKIN_URL=http://zipkin:9411/api/v2/spans
+      # Datadog Configuration
+      - DD_SERVICE=banking-system
+      - DD_ENV=docker
+      - DD_VERSION=1.0.0
+      - DD_API_KEY=${DD_API_KEY}
+      - DD_SITE=us5.datadoghq.com
+      - DD_LOGS_INJECTION=true
+      - DD_TRACE_SAMPLE_RATE=1
+      - DD_PROFILING_ENABLED=true
+      - DD_AGENT_HOST=localhost
+      - DD_TRACE_AGENT_PORT=8126
+      # Disable OpenTelemetry auto-instrumentation to avoid compatibility issues
+      - OTEL_JAVAAGENT_ENABLED=false
+      - OTEL_SDK_DISABLED=true
+      # Performance optimizations
+      - JAVA_OPTS=-Xms512m -Xmx2g -XX:+UseG1GC -XX:MaxGCPauseMillis=100
     depends_on:
       - postgres
       - kafka

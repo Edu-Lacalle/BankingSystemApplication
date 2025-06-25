@@ -1,8 +1,7 @@
 package com.bank.BankingSystemApplication.application.service.kafka;
 
-import com.bank.BankingSystemApplication.infrastructure.config.KafkaConfig;
+import com.bank.BankingSystemApplication.application.config.KafkaConfig;
 import com.bank.BankingSystemApplication.domain.model.*;
-import com.bank.BankingSystemApplication.application.service.kafka.TransactionEventProducer;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -12,7 +11,6 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.kafka.core.KafkaTemplate;
 
 import java.math.BigDecimal;
-import java.time.LocalDateTime;
 
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;

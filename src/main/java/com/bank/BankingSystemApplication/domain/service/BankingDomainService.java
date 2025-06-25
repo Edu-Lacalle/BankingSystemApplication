@@ -14,6 +14,7 @@ import com.bank.BankingSystemApplication.domain.model.NotificationType;
 import com.bank.BankingSystemApplication.domain.model.Account;
 import com.bank.BankingSystemApplication.infrastructure.audit.BankingAuditService;
 import com.bank.BankingSystemApplication.infrastructure.monitoring.BankingMetricsService;
+import com.bank.BankingSystemApplication.infrastructure.async.AsyncNotificationService;
 import io.micrometer.core.instrument.Timer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -45,6 +46,9 @@ public class BankingDomainService implements BankingUseCase {
     @Autowired
     private BankingAuditService auditService;
     
+    @Autowired
+    private AsyncNotificationService asyncNotificationService;
+    
     @Override
     @Transactional
     public Account createAccount(AccountCreationRequest request) {
@@ -69,8 +73,16 @@ public class BankingDomainService implements BankingUseCase {
             account.setName(request.getName());
             account.setCpf(request.getCpf());
             account.setBirthDate(request.getBirthDate());
-            account.setEmail(request.getEmail());
-            account.setPhone(request.getPhone());
+            
+            // Only set email if it's not null and not empty
+            if (request.getEmail() != null && !request.getEmail().trim().isEmpty()) {
+                account.setEmail(request.getEmail().trim());
+            }
+            
+            // Only set phone if it's not null and not empty
+            if (request.getPhone() != null && !request.getPhone().trim().isEmpty()) {
+                account.setPhone(request.getPhone().trim());
+            }
             
             Account savedAccount = persistencePort.save(account);
             
@@ -80,14 +92,10 @@ public class BankingDomainService implements BankingUseCase {
             auditService.auditAccountCreation(savedAccount.getId(), request.getCpf(), 
                                             request.getName(), true, "Conta criada com sucesso");
             
-            NotificationEvent notificationEvent = new NotificationEvent();
-            notificationEvent.setAccountId(savedAccount.getId());
-            notificationEvent.setMessage("Account created successfully");
-            notificationEvent.setType(NotificationType.ACCOUNT_CREATED);
-            notificationEvent.setTimestamp(LocalDateTime.now());
-            eventPort.publishNotificationEvent(notificationEvent);
-            
             logger.info("Domain: Account created successfully. ID: {}", savedAccount.getId());
+            
+            // Publish notification event asynchronously after transaction commits
+            asyncNotificationService.publishAccountCreationNotification(savedAccount);
             
             return savedAccount;
             
@@ -232,4 +240,5 @@ public class BankingDomainService implements BankingUseCase {
     private String maskCpf(String cpf) {
         return cpf.substring(0, 3) + "*****" + cpf.substring(8);
     }
+    
 }

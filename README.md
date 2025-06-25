@@ -1,318 +1,196 @@
-# API Banking System - Documentação
+# 🏦 Banking System Application
 
-## Visão Geral
-A API Banking System é um sistema de gerenciamento de contas bancárias desenvolvido em Spring Boot. Permite criar contas, realizar operações de crédito e débito, e consultar informações de contas.
+A comprehensive banking system built with Spring Boot 3.1.5, implementing hexagonal architecture for high scalability and maintainability.
 
-## Informações Técnicas
-- **Framework**: Spring Boot 3.1.5
-- **Java**: 17
-- **Banco de Dados**: H2 (em memória)
-- **Documentação**: OpenAPI 3.0 (Swagger)
-- **Porta**: 8080 (padrão)
+## 🚀 Quick Start
 
-## URL Base
+### Prerequisites
+- Java 17+
+- Docker & Docker Compose
+- Maven 3.8+
+
+### Run with Docker (Recommended)
+```bash
+# Start all services
+docker-compose up -d
+
+# Verify health
+curl http://localhost:8080/actuator/health
 ```
-http://localhost:8080/api
+
+### Run Locally (Development)
+```bash
+# Start dependencies only
+docker-compose up -d postgres kafka zookeeper
+
+# Run application
+mvn spring-boot:run
 ```
 
-## Documentação Swagger
-- **Swagger UI**: http://localhost:8080/swagger-ui.html
-- **OpenAPI JSON**: http://localhost:8080/api-docs
+## 🏗️ Architecture
 
-## Endpoints
+**Hexagonal Architecture** with:
+- **Domain**: Core business logic and entities
+- **Application**: Use cases and orchestration
+- **Infrastructure**: External integrations (DB, Kafka, etc.)
+- **Adapters**: Web controllers and external services
 
-### 1. Criar Conta
-Cria uma nova conta bancária.
+**Technology Stack**:
+- Spring Boot 3.1.5, Java 17
+- PostgreSQL 15 with Flyway migrations
+- Apache Kafka for async processing
+- Datadog APM for monitoring
+- Docker containerization
 
-**Endpoint**: `POST /api/accounts`
+## 📊 Services & Ports
 
-**Corpo da Requisição**:
-```json
+| Service | Port | URL | Description |
+|---------|------|-----|-------------|
+| **Banking API** | 8080 | http://localhost:8080 | Main application |
+| **Swagger UI** | 8080 | http://localhost:8080/swagger-ui.html | API documentation |
+| **PgAdmin** | 8081 | http://localhost:8081 | Database UI |
+| **Kafka UI** | 8082 | http://localhost:8082 | Message broker UI |
+| **Zipkin** | 9411 | http://localhost:9411 | Distributed tracing |
+
+## 🔌 API Endpoints
+
+### Core Banking Operations
+```bash
+# Create account
+POST /api/accounts
 {
   "name": "João Silva",
   "cpf": "12345678901",
   "birthDate": "1990-01-15",
-  "email": "joao@email.com",
-  "phone": "11987654321"
+  "email": "joao@email.com"
 }
-```
 
-**Campos Obrigatórios**:
-- `name`: Nome completo (obrigatório)
-- `cpf`: CPF com 11 dígitos (obrigatório, único)
-- `birthDate`: Data de nascimento no formato YYYY-MM-DD (obrigatório)
-
-**Campos Opcionais**:
-- `email`: Email válido
-- `phone`: Telefone com 10 ou 11 dígitos
-
-**Respostas**:
-- **201 Created**: Conta criada com sucesso
-- **400 Bad Request**: Dados inválidos
-- **500 Internal Server Error**: Erro interno do servidor
-
-**Exemplo de Resposta (201)**:
-```json
-{
-  "id": 1,
-  "name": "João Silva",
-  "cpf": "12345678901",
-  "birthDate": "1990-01-15",
-  "balance": 0.00,
-  "email": "joao@email.com",
-  "phone": "11987654321",
-  "version": 0
-}
-```
-
-### 2. Creditar Conta
-Adiciona valor ao saldo de uma conta.
-
-**Endpoint**: `POST /api/accounts/credit`
-
-**Corpo da Requisição**:
-```json
+# Credit account
+POST /api/accounts/credit
 {
   "accountId": 1,
   "amount": 100.50
 }
-```
 
-**Campos**:
-- `accountId`: ID da conta (obrigatório)
-- `amount`: Valor a ser creditado (obrigatório, deve ser positivo)
-
-**Respostas**:
-- **200 OK**: Transação efetuada com sucesso
-- **400 Bad Request**: Dados inválidos ou conta não encontrada
-
-**Exemplo de Resposta (200)**:
-```json
-{
-  "status": "EFETUADO",
-  "message": "Crédito efetuado com sucesso"
-}
-```
-
-**Exemplo de Resposta (400)**:
-```json
-{
-  "status": "RECUSADO",
-  "message": "Conta não encontrada"
-}
-```
-
-### 3. Debitar Conta
-Remove valor do saldo de uma conta.
-
-**Endpoint**: `POST /api/accounts/debit`
-
-**Corpo da Requisição**:
-```json
+# Debit account
+POST /api/accounts/debit
 {
   "accountId": 1,
   "amount": 50.25
 }
+
+# Get account
+GET /api/accounts/{id}
 ```
 
-**Campos**:
-- `accountId`: ID da conta (obrigatório)
-- `amount`: Valor a ser debitado (obrigatório, deve ser positivo)
-
-**Respostas**:
-- **200 OK**: Transação efetuada com sucesso
-- **400 Bad Request**: Dados inválidos, conta não encontrada ou saldo insuficiente
-
-**Exemplo de Resposta (200)**:
-```json
-{
-  "status": "EFETUADO",
-  "message": "Débito efetuado com sucesso"
-}
-```
-
-**Exemplo de Resposta (400)**:
-```json
-{
-  "status": "RECUSADO",
-  "message": "Saldo insuficiente"
-}
-```
-
-### 4. Consultar Conta
-Busca informações de uma conta pelo ID.
-
-**Endpoint**: `GET /api/accounts/{id}`
-
-**Parâmetros**:
-- `id`: ID da conta (obrigatório)
-
-**Respostas**:
-- **200 OK**: Conta encontrada
-- **404 Not Found**: Conta não encontrada
-- **500 Internal Server Error**: Erro interno do servidor
-
-**Exemplo de Resposta (200)**:
-```json
-{
-  "id": 1,
-  "name": "João Silva",
-  "cpf": "12345678901",
-  "birthDate": "1990-01-15",
-  "balance": 50.25,
-  "email": "joao@email.com",
-  "phone": "11987654321",
-  "version": 2
-}
-```
-
-## Modelos de Dados
-
-### Account (Conta)
-```json
-{
-  "id": "number",
-  "name": "string",
-  "cpf": "string",
-  "birthDate": "date",
-  "balance": "decimal",
-  "email": "string",
-  "phone": "string",
-  "version": "number"
-}
-```
-
-### AccountCreationRequest
-```json
-{
-  "name": "string (obrigatório)",
-  "cpf": "string (obrigatório, 11 dígitos)",
-  "birthDate": "date (obrigatório)",
-  "email": "string (formato email)",
-  "phone": "string (10-11 dígitos)"
-}
-```
-
-### TransactionRequest
-```json
-{
-  "accountId": "number (obrigatório)",
-  "amount": "decimal (obrigatório, positivo)"
-}
-```
-
-### TransactionResponse
-```json
-{
-  "status": "EFETUADO | RECUSADO",
-  "message": "string"
-}
-```
-
-## Códigos de Status HTTP
-
-### Sucesso
-- **200 OK**: Requisição processada com sucesso
-- **201 Created**: Recurso criado com sucesso
-
-### Erro do Cliente
-- **400 Bad Request**: Dados inválidos na requisição
-- **404 Not Found**: Recurso não encontrado
-
-### Erro do Servidor
-- **500 Internal Server Error**: Erro interno do servidor
-
-## Validações
-
-### CPF
-- Deve conter exatamente 11 dígitos numéricos
-- Deve ser único no sistema
-
-### Email
-- Deve ter formato válido de email
-- Campo opcional
-
-### Telefone
-- Deve conter 10 ou 11 dígitos numéricos
-- Campo opcional
-
-### Valores Monetários
-- Devem ser positivos
-- Precisão de 2 casas decimais
-
-## Tratamento de Erros
-
-A API retorna mensagens de erro em português. Exemplos:
-
-```json
-{
-  "status": "RECUSADO",
-  "message": "Conta não encontrada"
-}
-```
-
-```json
-{
-  "status": "RECUSADO",
-  "message": "Saldo insuficiente"
-}
-```
-
-## Configuração do Banco de Dados
-
-A aplicação utiliza banco H2 em memória:
-- **Console H2**: http://localhost:8080/h2-console
-- **URL**: jdbc:h2:mem:testdb
-- **Usuário**: sa
-- **Senha**: password
-
-## Como Executar
-
-1. Certifique-se de ter Java 17 instalado
-2. Execute o comando: `mvn spring-boot:run`
-3. A API estará disponível em: http://localhost:8080
-4. Acesse a documentação Swagger em: http://localhost:8080/swagger-ui.html
-
-## Exemplos de Uso
-
-### Criar uma conta
+### API Gateway (Enhanced)
 ```bash
+# Unified operations through gateway
+POST /api/gateway/accounts
+POST /api/gateway/transactions/credit
+POST /api/gateway/transactions/debit
+GET /api/gateway/accounts/{id}
+```
+
+## ⚡ Async Processing with Kafka
+
+**Topics**:
+- `banking.account.create` - Account creation events
+- `banking.transaction.credit` - Credit transactions
+- `banking.transaction.debit` - Debit transactions
+- `banking.notifications` - Email notifications
+
+**Async Endpoints**:
+```bash
+POST /api/accounts/async          # Creates account + publishes events
+POST /api/accounts/async/credit   # Credits + audit + notification
+POST /api/accounts/async/debit    # Debits + audit + notification
+```
+
+## 📈 Monitoring & Observability
+
+- **Datadog APM**: Full application monitoring (requires `DD_API_KEY` environment variable)
+- **Health Checks**: `/actuator/health`
+- **Metrics**: `/actuator/metrics`
+- **Performance Dashboard**: `/api/performance/dashboard`
+- **Distributed Tracing**: Zipkin integration
+
+## 🔒 Security & Validation
+
+- **Optimistic Locking**: Version control for concurrency
+- **Input Validation**: CPF uniqueness, email format, positive amounts
+- **Structured Error Handling**: Standardized error responses with request tracking
+- **HTTP Status Codes**: Proper 4xx/5xx responses for different scenarios
+
+## 🧪 Testing
+
+```bash
+# Run tests
+mvn test
+
+# Create test account
 curl -X POST http://localhost:8080/api/accounts \
   -H "Content-Type: application/json" \
-  -d '{
-    "name": "Maria Santos",
-    "cpf": "98765432100",
-    "birthDate": "1985-03-20",
-    "email": "maria@email.com",
-    "phone": "11999888777"
-  }'
+  -d '{"name":"Test User","cpf":"12345678901","birthDate":"1990-01-01"}'
 ```
 
-### Creditar conta
+## 🛠️ Development
+
 ```bash
-curl -X POST http://localhost:8080/api/accounts/credit \
-  -H "Content-Type: application/json" \
-  -d '{
-    "accountId": 1,
-    "amount": 500.00
-  }'
+# Build
+mvn clean install
+
+# Run with profile
+mvn spring-boot:run -Dspring-boot.run.profiles=development
+
+# View logs
+docker-compose logs -f banking-app
 ```
 
-### Debitar conta
+## 📚 Documentation
+
+- **[Setup Guide](docs/SETUP.md)** - Detailed installation and configuration
+- **[Architecture](docs/ARCHITECTURE.md)** - In-depth architectural decisions
+- **[API Reference](docs/API-REFERENCE.md)** - Complete API documentation
+- **[Monitoring](docs/MONITORING.md)** - Performance and Datadog setup
+- **[Development](docs/DEVELOPMENT.md)** - Patterns and best practices
+- **[Cloud Deployment](docs/CLOUD-DEPLOYMENT.md)** - AWS infrastructure, CI/CD pipeline, and deployment strategies
+
+## 🔧 Configuration
+
+**Database**:
+- URL: `jdbc:postgresql://localhost:5432/banking_system`
+- User: `banking_user` / Password: `banking_password`
+
+**Kafka**: 
+- Brokers: `localhost:9092`
+- Auto-topic creation enabled
+
+**Datadog**:
+- Site: `us5.datadoghq.com`
+- APM enabled with local agent on port 8126
+
+## 🚨 Troubleshooting
+
 ```bash
-curl -X POST http://localhost:8080/api/accounts/debit \
-  -H "Content-Type: application/json" \
-  -d '{
-    "accountId": 1,
-    "amount": 100.00
-  }'
+# Reset everything
+docker-compose down -v && docker-compose up -d
+
+# Check service health
+curl http://localhost:8080/actuator/health
+
+# View application logs
+docker-compose logs -f banking-app
+
+# Database connection test
+docker exec -it banking_postgres psql -U banking_user -d banking_system
 ```
 
-### Consultar conta
-```bash
-curl http://localhost:8080/api/accounts/1
-```
+## 📞 Support
 
-## Controle de Versão
+- Health Check: http://localhost:8080/actuator/health
+- Swagger UI: http://localhost:8080/swagger-ui.html
+- Logs: `docker-compose logs -f banking-app`
 
-A entidade Account possui controle de versão otimista através do campo `version`, que é incrementado automaticamente a cada atualização para evitar conflitos de concorrência.
+---
+**Built with Spring Boot 3.1.5 • Hexagonal Architecture • Datadog Monitoring**
