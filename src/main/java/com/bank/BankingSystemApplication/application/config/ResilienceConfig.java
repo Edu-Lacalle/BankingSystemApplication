@@ -1,4 +1,4 @@
-package com.bank.BankingSystemApplication.infrastructure.config;
+package com.bank.BankingSystemApplication.application.config;
 
 import io.github.resilience4j.circuitbreaker.CircuitBreakerConfig;
 import io.github.resilience4j.retry.RetryConfig;

@@ -5,11 +5,17 @@
 
 echo "🚀 Starting Banking System with Datadog APM..."
 
-# Set default Datadog API key if not provided
+# Check for Datadog API key
 if [ -z "$DD_API_KEY" ]; then
-    echo "📡 Using default Datadog API key from configuration"
-    export DD_API_KEY="c576fa9380cc70a22dee72e7df176697"
-    export DD_SITE="us5.datadoghq.com"
+    echo "⚠️  DD_API_KEY environment variable not set"
+    echo "   Please set your Datadog API key: export DD_API_KEY=your_api_key"
+    echo "   You can get it from: https://app.datadoghq.com/organization-settings/api-keys"
+    echo ""
+    echo "   For now, running without Datadog APM..."
+    export DD_SITE=${DD_SITE:-"us5.datadoghq.com"}
+else
+    echo "📡 Using Datadog API key from environment"
+    export DD_SITE=${DD_SITE:-"us5.datadoghq.com"}
 fi
 
 # Baixar o agente APM do Datadog se não existir

@@ -24,6 +24,9 @@ import jakarta.validation.Valid;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+import org.springframework.web.context.request.async.DeferredResult;
 
 @RestController
 @RequestMapping("/api/gateway")
@@ -52,42 +55,63 @@ public class ApiGateway {
         @ApiResponse(responseCode = "422", description = "Erro de regra de negócio"),
         @ApiResponse(responseCode = "500", description = "Erro interno do servidor")
     })
-    public ResponseEntity<SuccessResponse<?>> createAccount(@Valid @RequestBody AccountCreationRequest request) {
+    public ResponseEntity<?> createAccount(@Valid @RequestBody AccountCreationRequest request) {
         String requestId = generateRequestId();
-        logger.info("Gateway routing account creation request - RequestId: {}", requestId);
         
-        if (loadMonitor.shouldUseAsyncProcessing()) {
-            logger.info("High load detected, routing to async processing - RequestId: {}", requestId);
-            CompletableFuture<String> asyncResult = asyncAdapter.createAccountAsync(request);
-            
-            Map<String, String> asyncInfo = Map.of(
-                "requestId", requestId,
-                "status", "PROCESSING",
-                "estimatedTime", "30-60 seconds"
-            );
-            
-            SuccessResponse<Map<String, String>> response = SuccessResponse.created(
-                asyncInfo, 
-                "Solicitação aceita para processamento assíncrono"
-            );
-            response.setRequestId(requestId);
-            
-            return new ResponseEntity<>(response, HttpStatus.ACCEPTED);
-        } else {
-            logger.info("Normal load, routing to sync processing - RequestId: {}", requestId);
-            ResponseEntity<?> syncResponse = syncController.createAccount(request);
-            
-            if (syncResponse.getStatusCode() == HttpStatus.CREATED) {
-                SuccessResponse<Object> response = SuccessResponse.created(
-                    syncResponse.getBody(),
-                    "Conta criada com sucesso"
+        try {
+            // Fast path: check load without logging overhead in normal load scenarios
+            if (loadMonitor.shouldUseAsyncProcessing()) {
+                logger.info("High load detected, routing to async processing - RequestId: {}", requestId);
+                CompletableFuture<String> asyncResult = asyncAdapter.createAccountAsync(request);
+                
+                Map<String, String> asyncInfo = Map.of(
+                    "requestId", requestId,
+                    "status", "PROCESSING",
+                    "estimatedTime", "30-60 seconds"
+                );
+                
+                SuccessResponse<Map<String, String>> response = SuccessResponse.created(
+                    asyncInfo, 
+                    "Solicitação aceita para processamento assíncrono"
                 );
                 response.setRequestId(requestId);
-                return new ResponseEntity<>(response, HttpStatus.CREATED);
+                
+                return new ResponseEntity<>(response, HttpStatus.ACCEPTED);
+            } else {
+                // Direct delegation to sync controller with timeout handling
+                logger.info("Normal load, routing to sync processing - RequestId: {}", requestId);
+                ResponseEntity<?> syncResponse = executeWithTimeout(() -> syncController.createAccount(request), 30, requestId);
+                
+                if (syncResponse.getStatusCode() == HttpStatus.OK) {
+                    SuccessResponse<Object> response = SuccessResponse.created(
+                        syncResponse.getBody(),
+                        "Conta criada com sucesso"
+                    );
+                    response.setRequestId(requestId);
+                    return new ResponseEntity<>(response, HttpStatus.CREATED);
+                }
+                
+                // Para outros status codes, retorna a resposta original
+                return (ResponseEntity<SuccessResponse<?>>) syncResponse;
             }
-            
-            // Para outros status codes, retorna a resposta original
-            return (ResponseEntity<SuccessResponse<?>>) syncResponse;
+        } catch (TimeoutException e) {
+            logger.error("Request timeout - RequestId: {} - Operation: createAccount - Details: {}", requestId, e.getMessage());
+            ErrorResponse errorResponse = new ErrorResponse(
+                "REQUEST_TIMEOUT",
+                "A operação demorou mais que o esperado para ser processada",
+                "Tente novamente em alguns instantes ou use o modo assíncrono",
+                requestId
+            );
+            return new ResponseEntity<>(errorResponse, HttpStatus.REQUEST_TIMEOUT);
+        } catch (Exception e) {
+            logger.error("Unexpected error processing request - RequestId: {} - Operation: createAccount", requestId, e);
+            ErrorResponse errorResponse = new ErrorResponse(
+                "INTERNAL_SERVER_ERROR",
+                "Erro interno do servidor ao processar a solicitação",
+                "Verifique os dados enviados e tente novamente. Se o problema persistir, contate o suporte técnico.",
+                requestId
+            );
+            return new ResponseEntity<>(errorResponse, HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
     
@@ -101,43 +125,65 @@ public class ApiGateway {
         @ApiResponse(responseCode = "422", description = "Erro de regra de negócio"),
         @ApiResponse(responseCode = "500", description = "Erro interno do servidor")
     })
-    public ResponseEntity<SuccessResponse<?>> credit(@Valid @RequestBody TransactionRequest request) {
+    public ResponseEntity<?> credit(@Valid @RequestBody TransactionRequest request) {
         String requestId = generateRequestId();
         logger.info("Gateway routing credit transaction request - RequestId: {} - Account: {} - Amount: {}", 
             requestId, request.getAccountId(), request.getAmount());
         
-        if (loadMonitor.shouldUseAsyncProcessing()) {
-            logger.info("High load detected, routing to async processing - RequestId: {}", requestId);
-            CompletableFuture<String> asyncResult = asyncAdapter.processCreditAsync(request);
-            
-            Map<String, Object> asyncInfo = Map.of(
-                "requestId", requestId,
-                "accountId", request.getAccountId(),
-                "amount", request.getAmount(),
-                "status", "PROCESSING"
-            );
-            
-            SuccessResponse<Map<String, Object>> response = SuccessResponse.ok(
-                asyncInfo,
-                "Operação de crédito aceita para processamento assíncrono"
-            );
-            response.setRequestId(requestId);
-            
-            return new ResponseEntity<>(response, HttpStatus.ACCEPTED);
-        } else {
-            logger.info("Normal load, routing to sync processing - RequestId: {}", requestId);
-            ResponseEntity<?> syncResponse = syncController.credit(request);
-            
-            if (syncResponse.getStatusCode() == HttpStatus.OK) {
-                SuccessResponse<Object> response = SuccessResponse.ok(
-                    syncResponse.getBody(),
-                    "Operação de crédito processada com sucesso"
+        try {
+            if (loadMonitor.shouldUseAsyncProcessing()) {
+                logger.info("High load detected, routing to async processing - RequestId: {}", requestId);
+                CompletableFuture<String> asyncResult = asyncAdapter.processCreditAsync(request);
+                
+                Map<String, Object> asyncInfo = Map.of(
+                    "requestId", requestId,
+                    "accountId", request.getAccountId(),
+                    "amount", request.getAmount(),
+                    "status", "PROCESSING"
+                );
+                
+                SuccessResponse<Map<String, Object>> response = SuccessResponse.ok(
+                    asyncInfo,
+                    "Operação de crédito aceita para processamento assíncrono"
                 );
                 response.setRequestId(requestId);
-                return new ResponseEntity<>(response, HttpStatus.OK);
+                
+                return new ResponseEntity<>(response, HttpStatus.ACCEPTED);
+            } else {
+                logger.info("Normal load, routing to sync processing - RequestId: {}", requestId);
+                ResponseEntity<?> syncResponse = executeWithTimeout(() -> syncController.credit(request), 5, requestId);
+                
+                if (syncResponse.getStatusCode() == HttpStatus.OK) {
+                    SuccessResponse<Object> response = SuccessResponse.ok(
+                        syncResponse.getBody(),
+                        "Operação de crédito processada com sucesso"
+                    );
+                    response.setRequestId(requestId);
+                    return new ResponseEntity<>(response, HttpStatus.OK);
+                }
+                
+                return (ResponseEntity<SuccessResponse<?>>) syncResponse;
             }
-            
-            return (ResponseEntity<SuccessResponse<?>>) syncResponse;
+        } catch (TimeoutException e) {
+            logger.error("Request timeout - RequestId: {} - Operation: credit - Account: {} - Amount: {} - Details: {}", 
+                requestId, request.getAccountId(), request.getAmount(), e.getMessage());
+            ErrorResponse errorResponse = new ErrorResponse(
+                "REQUEST_TIMEOUT",
+                "A operação de crédito demorou mais que o esperado para ser processada",
+                String.format("Conta: %d, Valor: %.2f - Tente novamente em alguns instantes", request.getAccountId(), request.getAmount()),
+                requestId
+            );
+            return new ResponseEntity<>(errorResponse, HttpStatus.REQUEST_TIMEOUT);
+        } catch (Exception e) {
+            logger.error("Unexpected error processing credit - RequestId: {} - Account: {} - Amount: {}", 
+                requestId, request.getAccountId(), request.getAmount(), e);
+            ErrorResponse errorResponse = new ErrorResponse(
+                "INTERNAL_SERVER_ERROR",
+                "Erro interno do servidor ao processar operação de crédito",
+                String.format("Conta: %d, Valor: %.2f - Verifique os dados e tente novamente", request.getAccountId(), request.getAmount()),
+                requestId
+            );
+            return new ResponseEntity<>(errorResponse, HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
     
@@ -151,43 +197,65 @@ public class ApiGateway {
         @ApiResponse(responseCode = "422", description = "Saldo insuficiente ou erro de regra de negócio"),
         @ApiResponse(responseCode = "500", description = "Erro interno do servidor")
     })
-    public ResponseEntity<SuccessResponse<?>> debit(@Valid @RequestBody TransactionRequest request) {
+    public ResponseEntity<?> debit(@Valid @RequestBody TransactionRequest request) {
         String requestId = generateRequestId();
         logger.info("Gateway routing debit transaction request - RequestId: {} - Account: {} - Amount: {}", 
             requestId, request.getAccountId(), request.getAmount());
         
-        if (loadMonitor.shouldUseAsyncProcessing()) {
-            logger.info("High load detected, routing to async processing - RequestId: {}", requestId);
-            CompletableFuture<String> asyncResult = asyncAdapter.processDebitAsync(request);
-            
-            Map<String, Object> asyncInfo = Map.of(
-                "requestId", requestId,
-                "accountId", request.getAccountId(),
-                "amount", request.getAmount(),
-                "status", "PROCESSING"
-            );
-            
-            SuccessResponse<Map<String, Object>> response = SuccessResponse.ok(
-                asyncInfo,
-                "Operação de débito aceita para processamento assíncrono"
-            );
-            response.setRequestId(requestId);
-            
-            return new ResponseEntity<>(response, HttpStatus.ACCEPTED);
-        } else {
-            logger.info("Normal load, routing to sync processing - RequestId: {}", requestId);
-            ResponseEntity<?> syncResponse = syncController.debit(request);
-            
-            if (syncResponse.getStatusCode() == HttpStatus.OK) {
-                SuccessResponse<Object> response = SuccessResponse.ok(
-                    syncResponse.getBody(),
-                    "Operação de débito processada com sucesso"
+        try {
+            if (loadMonitor.shouldUseAsyncProcessing()) {
+                logger.info("High load detected, routing to async processing - RequestId: {}", requestId);
+                CompletableFuture<String> asyncResult = asyncAdapter.processDebitAsync(request);
+                
+                Map<String, Object> asyncInfo = Map.of(
+                    "requestId", requestId,
+                    "accountId", request.getAccountId(),
+                    "amount", request.getAmount(),
+                    "status", "PROCESSING"
+                );
+                
+                SuccessResponse<Map<String, Object>> response = SuccessResponse.ok(
+                    asyncInfo,
+                    "Operação de débito aceita para processamento assíncrono"
                 );
                 response.setRequestId(requestId);
-                return new ResponseEntity<>(response, HttpStatus.OK);
+                
+                return new ResponseEntity<>(response, HttpStatus.ACCEPTED);
+            } else {
+                logger.info("Normal load, routing to sync processing - RequestId: {}", requestId);
+                ResponseEntity<?> syncResponse = executeWithTimeout(() -> syncController.debit(request), 5, requestId);
+                
+                if (syncResponse.getStatusCode() == HttpStatus.OK) {
+                    SuccessResponse<Object> response = SuccessResponse.ok(
+                        syncResponse.getBody(),
+                        "Operação de débito processada com sucesso"
+                    );
+                    response.setRequestId(requestId);
+                    return new ResponseEntity<>(response, HttpStatus.OK);
+                }
+                
+                return (ResponseEntity<SuccessResponse<?>>) syncResponse;
             }
-            
-            return (ResponseEntity<SuccessResponse<?>>) syncResponse;
+        } catch (TimeoutException e) {
+            logger.error("Request timeout - RequestId: {} - Operation: debit - Account: {} - Amount: {} - Details: {}", 
+                requestId, request.getAccountId(), request.getAmount(), e.getMessage());
+            ErrorResponse errorResponse = new ErrorResponse(
+                "REQUEST_TIMEOUT",
+                "A operação de débito demorou mais que o esperado para ser processada",
+                String.format("Conta: %d, Valor: %.2f - Tente novamente em alguns instantes", request.getAccountId(), request.getAmount()),
+                requestId
+            );
+            return new ResponseEntity<>(errorResponse, HttpStatus.REQUEST_TIMEOUT);
+        } catch (Exception e) {
+            logger.error("Unexpected error processing debit - RequestId: {} - Account: {} - Amount: {}", 
+                requestId, request.getAccountId(), request.getAmount(), e);
+            ErrorResponse errorResponse = new ErrorResponse(
+                "INTERNAL_SERVER_ERROR",
+                "Erro interno do servidor ao processar operação de débito",
+                String.format("Conta: %d, Valor: %.2f - Verifique os dados e tente novamente", request.getAccountId(), request.getAmount()),
+                requestId
+            );
+            return new ResponseEntity<>(errorResponse, HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
     
@@ -241,6 +309,23 @@ public class ApiGateway {
         response.setRequestId(requestId);
         
         return ResponseEntity.ok(response);
+    }
+    
+    /**
+     * Executa uma operação com timeout para evitar travamentos.
+     */
+    private <T> T executeWithTimeout(java.util.function.Supplier<T> operation, int timeoutSeconds, String requestId) throws TimeoutException {
+        CompletableFuture<T> future = CompletableFuture.supplyAsync(operation);
+        try {
+            return future.get(timeoutSeconds, TimeUnit.SECONDS);
+        } catch (TimeoutException e) {
+            future.cancel(true);
+            logger.warn("Operation timed out after {} seconds - RequestId: {}", timeoutSeconds, requestId);
+            throw e;
+        } catch (Exception e) {
+            logger.error("Error executing operation - RequestId: {}", requestId, e);
+            throw new RuntimeException("Error executing operation", e);
+        }
     }
     
     /**

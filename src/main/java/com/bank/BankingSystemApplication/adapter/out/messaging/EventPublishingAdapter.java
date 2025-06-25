@@ -30,6 +30,17 @@ public class EventPublishingAdapter implements EventPublishingPort {
     @Override
     public void publishNotificationEvent(NotificationEvent event) {
         logger.info("Adapter: Publishing notification event for account: {}", event.getAccountId());
-        kafkaTemplate.send("banking.notifications", event);
+        
+        // Send asynchronously to avoid blocking the HTTP request
+        kafkaTemplate.send("banking.notifications", event)
+            .whenComplete((result, failure) -> {
+                if (failure != null) {
+                    logger.error("Failed to send notification event for account: {}", 
+                               event.getAccountId(), failure);
+                } else {
+                    logger.debug("Successfully sent notification event for account: {}", 
+                               event.getAccountId());
+                }
+            });
     }
 }

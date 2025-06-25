@@ -1,4 +1,4 @@
-package com.bank.BankingSystemApplication.infrastructure.config;
+package com.bank.BankingSystemApplication.application.config;
 
 import com.bank.BankingSystemApplication.infrastructure.monitoring.PerformanceInterceptor;
 import org.springframework.beans.factory.annotation.Autowired;

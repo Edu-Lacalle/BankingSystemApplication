@@ -1,6 +1,6 @@
 package com.bank.BankingSystemApplication.application.service.kafka;
 
-import com.bank.BankingSystemApplication.infrastructure.config.KafkaConfig;
+import com.bank.BankingSystemApplication.application.config.KafkaConfig;
 import com.bank.BankingSystemApplication.domain.model.TransactionEvent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

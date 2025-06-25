@@ -1,6 +1,6 @@
 package com.bank.BankingSystemApplication.application.service.kafka;
 
-import com.bank.BankingSystemApplication.infrastructure.config.KafkaConfig;
+import com.bank.BankingSystemApplication.application.config.KafkaConfig;
 import com.bank.BankingSystemApplication.domain.model.TransactionEvent;
 import com.bank.BankingSystemApplication.domain.model.NotificationEvent;
 import io.github.resilience4j.retry.annotation.Retry;

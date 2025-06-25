@@ -30,7 +30,6 @@ public class BankingController {
     public ResponseEntity<Account> createAccount(@Valid @RequestBody AccountCreationRequest request) {
         loadMonitor.incrementConnections();
         try {
-            logger.info("Adapter: Sync account creation request");
             Account account = bankingUseCase.createAccount(request);
             return ResponseEntity.ok(account);
         } finally {
@@ -42,7 +41,6 @@ public class BankingController {
     public ResponseEntity<TransactionResponse> credit(@Valid @RequestBody TransactionRequest request) {
         loadMonitor.incrementConnections();
         try {
-            logger.info("Adapter: Sync credit transaction request");
             TransactionResponse response = bankingUseCase.credit(request);
             return ResponseEntity.ok(response);
         } finally {
@@ -54,7 +52,6 @@ public class BankingController {
     public ResponseEntity<TransactionResponse> debit(@Valid @RequestBody TransactionRequest request) {
         loadMonitor.incrementConnections();
         try {
-            logger.info("Adapter: Sync debit transaction request");
             TransactionResponse response = bankingUseCase.debit(request);
             return ResponseEntity.ok(response);
         } finally {

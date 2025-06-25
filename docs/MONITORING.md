@@ -98,7 +98,7 @@ if (performanceMetricsService.isSlowOperation(duration)) {
 ```properties
 # Datadog Settings
 management.metrics.export.datadog.enabled=true
-management.metrics.export.datadog.api-key=c576fa9380cc70a22dee72e7df176697
+management.metrics.export.datadog.api-key=${DD_API_KEY}
 management.metrics.export.datadog.site=us5.datadoghq.com
 datadog.environment=production
 datadog.service=banking-system
@@ -425,7 +425,7 @@ performance.alerts.response-time-critical-threshold=1000      # 1 second
 ```properties
 # Datadog metrics export
 management.metrics.export.datadog.enabled=true
-management.metrics.export.datadog.api-key=c576fa9380cc70a22dee72e7df176697
+management.metrics.export.datadog.api-key=${DD_API_KEY}
 management.metrics.export.datadog.site=us5.datadoghq.com
 management.metrics.export.datadog.step=60s
 

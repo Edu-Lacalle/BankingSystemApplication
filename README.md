@@ -109,7 +109,7 @@ POST /api/accounts/async/debit    # Debits + audit + notification
 
 ## 📈 Monitoring & Observability
 
-- **Datadog APM**: Full application monitoring with API key `c576fa9380cc70a22dee72e7df176697`
+- **Datadog APM**: Full application monitoring (requires `DD_API_KEY` environment variable)
 - **Health Checks**: `/actuator/health`
 - **Metrics**: `/actuator/metrics`
 - **Performance Dashboard**: `/api/performance/dashboard`

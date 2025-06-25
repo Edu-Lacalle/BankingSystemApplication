@@ -1,4 +1,4 @@
-package com.bank.BankingSystemApplication.infrastructure.config;
+package com.bank.BankingSystemApplication.application.config;
 
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.datadog.DatadogConfig;

@@ -1,196 +1,267 @@
 package com.bank.BankingSystemApplication.infrastructure.monitoring;
 
-import io.micrometer.tracing.Span;
-import io.micrometer.tracing.Tracer;
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Timer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 @Service
 public class DatadogTracingService {
-    
+
     private static final Logger logger = LoggerFactory.getLogger(DatadogTracingService.class);
-    
-    private final Tracer tracer;
-    
+
     @Autowired
-    public DatadogTracingService(Tracer tracer) {
-        this.tracer = tracer;
+    private MeterRegistry meterRegistry;
+
+    @Value("${datadog.service.name:banking-system}")
+    private String serviceName;
+
+    @Value("${datadog.environment:local}")
+    private String environment;
+
+    private final Map<String, Timer.Sample> activeTimers = new ConcurrentHashMap<>();
+    private final Counter accountCreationCounter;
+    private final Counter transactionCounter;
+    private final Counter errorCounter;
+
+    public DatadogTracingService(MeterRegistry meterRegistry) {
+        this.meterRegistry = meterRegistry;
+        this.accountCreationCounter = Counter.builder("banking.account.creation")
+                .description("Number of account creation operations")
+                .register(meterRegistry);
+        this.transactionCounter = Counter.builder("banking.transaction")
+                .description("Number of banking transactions")
+                .register(meterRegistry);
+        this.errorCounter = Counter.builder("banking.error")
+                .description("Number of banking operation errors")
+                .register(meterRegistry);
     }
-    
-    public Span startBankingOperation(String operationType, String accountId) {
-        return startBankingOperation(operationType, accountId, null);
-    }
-    
-    public Span startBankingOperation(String operationType, String accountId, BigDecimal amount) {
-        Span span = tracer.nextSpan()
-                .name("banking.operation." + operationType.toLowerCase())
-                .tag("operation.type", operationType)
-                .tag("account.id", accountId)
-                .tag("service.name", "banking-system")
-                .tag("business.domain", "banking");
+
+    public BankingSpan startAccountCreation(String cpf) {
+        String operationId = "account_creation_" + System.nanoTime();
+        String operationName = "banking.account.create";
         
-        if (amount != null) {
-            span.tag("transaction.amount", amount.toString());
+        // Enhanced MDC context for log correlation
+        MDC.put("operation.id", operationId);
+        MDC.put("operation.type", "account_creation");
+        MDC.put("business.domain", "banking");
+        MDC.put("customer.cpf.masked", maskCpf(cpf));
+        MDC.put("service.name", serviceName);
+        MDC.put("environment", environment);
+        
+        // Start Micrometer timer
+        Timer.Sample timerSample = Timer.start(meterRegistry);
+        activeTimers.put(operationId, timerSample);
+        
+        logger.info("Starting account creation for customer: {}", maskCpf(cpf));
+        accountCreationCounter.increment();
+        
+        return new BankingSpan(operationId, operationName, timerSample);
+    }
+
+    public BankingSpan startTransaction(String accountId, String transactionType, BigDecimal amount) {
+        String operationId = "transaction_" + System.nanoTime();
+        String operationName = "banking.transaction." + transactionType.toLowerCase();
+        
+        // Enhanced MDC context
+        MDC.put("operation.id", operationId);
+        MDC.put("operation.type", "transaction");
+        MDC.put("transaction.type", transactionType);
+        MDC.put("business.domain", "banking");
+        MDC.put("account.id", accountId);
+        MDC.put("transaction.amount.range", categorizeAmount(amount));
+        MDC.put("service.name", serviceName);
+        MDC.put("environment", environment);
+        
+        Timer.Sample timerSample = Timer.start(meterRegistry);
+        activeTimers.put(operationId, timerSample);
+        
+        logger.info("Starting {} transaction for account: {}, amount: {}", 
+                transactionType, accountId, amount);
+        
+        // Create tagged counter for this transaction type
+        Counter.builder("banking.transaction")
+                .description("Number of banking transactions")
+                .tag("type", transactionType.toLowerCase())
+                .register(meterRegistry)
+                .increment();
+        
+        return new BankingSpan(operationId, operationName, timerSample);
+    }
+
+    public BankingSpan startDatabaseOperation(String operation, String table) {
+        String operationId = "db_" + System.nanoTime();
+        String operationName = "banking.database." + operation.toLowerCase();
+        
+        MDC.put("operation.id", operationId);
+        MDC.put("operation.type", "database");
+        MDC.put("db.operation", operation);
+        MDC.put("db.table", table);
+        MDC.put("service.name", serviceName);
+        MDC.put("environment", environment);
+        
+        Timer.Sample timerSample = Timer.start(meterRegistry);
+        activeTimers.put(operationId, timerSample);
+        
+        logger.debug("Starting database operation: {} on table: {}", operation, table);
+        
+        return new BankingSpan(operationId, operationName, timerSample);
+    }
+
+    public BankingSpan startKafkaOperation(String operation, String topic) {
+        String operationId = "kafka_" + System.nanoTime();
+        String operationName = "banking.kafka." + operation.toLowerCase();
+        
+        MDC.put("operation.id", operationId);
+        MDC.put("operation.type", "kafka");
+        MDC.put("kafka.operation", operation);
+        MDC.put("kafka.topic", topic);
+        MDC.put("service.name", serviceName);
+        MDC.put("environment", environment);
+        
+        Timer.Sample timerSample = Timer.start(meterRegistry);
+        activeTimers.put(operationId, timerSample);
+        
+        logger.debug("Starting Kafka operation: {} on topic: {}", operation, topic);
+        
+        return new BankingSpan(operationId, operationName, timerSample);
+    }
+
+    public void finishSpan(BankingSpan span) {
+        if (span == null || span.operationId == null) {
+            logger.warn("Attempted to finish null or invalid span");
+            return;
         }
-        
-        span.start();
-        
-        // Adiciona informações de trace ao MDC para logs correlacionados
-        updateMDCWithTraceInfo(span);
-        
-        logger.debug("Started banking operation trace: {} for account: {}", operationType, accountId);
-        return span;
-    }
-    
-    public Span startSagaOperation(String sagaType, String transactionId) {
-        Span span = tracer.nextSpan()
-                .name("banking.saga." + sagaType.toLowerCase())
-                .tag("saga.type", sagaType)
-                .tag("transaction.id", transactionId)
-                .tag("service.name", "banking-system")
-                .tag("business.domain", "banking")
-                .tag("pattern", "saga");
-        
-        span.start();
-        updateMDCWithTraceInfo(span);
-        
-        logger.debug("Started saga operation trace: {} for transaction: {}", sagaType, transactionId);
-        return span;
-    }
-    
-    public Span startKafkaOperation(String operationType, String topic) {
-        Span span = tracer.nextSpan()
-                .name("banking.messaging." + operationType.toLowerCase())
-                .tag("messaging.operation", operationType)
-                .tag("messaging.destination", topic)
-                .tag("messaging.system", "kafka")
-                .tag("service.name", "banking-system");
-        
-        span.start();
-        updateMDCWithTraceInfo(span);
-        
-        logger.debug("Started Kafka operation trace: {} on topic: {}", operationType, topic);
-        return span;
-    }
-    
-    public Span startDatabaseOperation(String operationType, String entity) {
-        Span span = tracer.nextSpan()
-                .name("banking.database." + operationType.toLowerCase())
-                .tag("db.operation", operationType)
-                .tag("db.table", entity)
-                .tag("db.system", "postgresql")
-                .tag("service.name", "banking-system");
-        
-        span.start();
-        updateMDCWithTraceInfo(span);
-        
-        logger.debug("Started database operation trace: {} on entity: {}", operationType, entity);
-        return span;
-    }
-    
-    public void tagSpanWithBusinessInfo(Span span, Map<String, String> businessTags) {
-        if (span != null && businessTags != null) {
-            businessTags.forEach(span::tag);
-        }
-    }
-    
-    public void tagSpanWithError(Span span, Throwable error) {
-        if (span != null && error != null) {
-            span.tag("error", "true")
-                .tag("error.kind", error.getClass().getSimpleName())
-                .tag("error.message", error.getMessage() != null ? error.getMessage() : "Unknown error");
-        }
-    }
-    
-    public void tagSpanWithPerformance(Span span, long durationMs) {
-        if (span != null) {
-            span.tag("performance.duration_ms", String.valueOf(durationMs));
-            
-            // Adiciona tags de performance baseadas na duração
-            if (durationMs > 5000) {
-                span.tag("performance.level", "very_slow");
-            } else if (durationMs > 1000) {
-                span.tag("performance.level", "slow");
-            } else if (durationMs > 500) {
-                span.tag("performance.level", "normal");
-            } else {
-                span.tag("performance.level", "fast");
+
+        try {
+            // Stop timer and record metrics
+            Timer.Sample timerSample = activeTimers.remove(span.operationId);
+            if (timerSample != null) {
+                Timer timer = Timer.builder(span.operationName)
+                        .description("Duration of " + span.operationName + " operation")
+                        .tag("service", serviceName)
+                        .tag("environment", environment)
+                        .tag("operation", extractOperationType(span.operationName))
+                        .register(meterRegistry);
+                timerSample.stop(timer);
             }
+
+            logger.info("Completed operation: {}", span.operationName);
+        } finally {
+            // Clear MDC to prevent memory leaks
+            clearOperationMDC();
         }
     }
-    
-    public void finishSpan(Span span) {
-        if (span != null) {
-            span.end();
-            clearMDCTraceInfo();
+
+    public void finishSpanWithError(BankingSpan span, Exception error) {
+        if (span == null || span.operationId == null) {
+            logger.warn("Attempted to finish null or invalid span with error");
+            return;
         }
-    }
-    
-    public void finishSpanWithError(Span span, Throwable error) {
-        if (span != null) {
-            tagSpanWithError(span, error);
-            span.end();
-            clearMDCTraceInfo();
+
+        try {
+            // Add error information to MDC
+            MDC.put("error.type", error.getClass().getSimpleName());
+            MDC.put("error.message", error.getMessage());
             
-            logger.error("Banking operation failed with error: {}", error.getMessage(), error);
-        }
-    }
-    
-    private void updateMDCWithTraceInfo(Span span) {
-        if (span != null && span.context() != null) {
-            String traceId = span.context().traceId();
-            String spanId = span.context().spanId();
-            
-            if (traceId != null) {
-                MDC.put("dd.trace_id", traceId);
-                MDC.put("traceId", traceId);
+            // Stop timer and record error metrics
+            Timer.Sample timerSample = activeTimers.remove(span.operationId);
+            if (timerSample != null) {
+                Timer timer = Timer.builder(span.operationName)
+                        .description("Duration of " + span.operationName + " operation")
+                        .tag("service", serviceName)
+                        .tag("environment", environment)
+                        .tag("operation", extractOperationType(span.operationName))
+                        .tag("status", "error")
+                        .register(meterRegistry);
+                timerSample.stop(timer);
             }
-            
-            if (spanId != null) {
-                MDC.put("dd.span_id", spanId);
-                MDC.put("spanId", spanId);
-            }
+
+            // Increment error counter with tags
+            Counter.builder("banking.error")
+                    .description("Number of banking operation errors")
+                    .tag("operation", extractOperationType(span.operationName))
+                    .tag("error_type", error.getClass().getSimpleName())
+                    .register(meterRegistry)
+                    .increment();
+
+            logger.error("Operation {} failed with error: {}", span.operationName, error.getMessage(), error);
+        } finally {
+            clearOperationMDC();
         }
     }
-    
-    private void clearMDCTraceInfo() {
-        MDC.remove("dd.trace_id");
-        MDC.remove("dd.span_id");
-        MDC.remove("traceId");
-        MDC.remove("spanId");
+
+    private String maskCpf(String cpf) {
+        if (cpf == null || cpf.length() < 8) {
+            return "***";
+        }
+        return cpf.substring(0, 3) + "***" + cpf.substring(cpf.length() - 3);
     }
-    
-    // Métodos de conveniência para operações bancárias específicas
-    public Span startAccountCreation(String accountId) {
-        return startBankingOperation("CREATE_ACCOUNT", accountId);
-    }
-    
-    public Span startTransaction(String accountId, BigDecimal amount, String transactionType) {
-        Span span = startBankingOperation("TRANSACTION", accountId, amount);
-        span.tag("transaction.type", transactionType);
-        return span;
-    }
-    
-    public Span startTransfer(String fromAccountId, String toAccountId, BigDecimal amount) {
-        Span span = tracer.nextSpan()
-                .name("banking.operation.transfer")
-                .tag("operation.type", "TRANSFER")
-                .tag("account.from", fromAccountId)
-                .tag("account.to", toAccountId)
-                .tag("transaction.amount", amount.toString())
-                .tag("service.name", "banking-system")
-                .tag("business.domain", "banking");
+
+    private String categorizeAmount(BigDecimal amount) {
+        if (amount == null) return "unknown";
         
-        span.start();
-        updateMDCWithTraceInfo(span);
-        
-        logger.debug("Started transfer trace from {} to {} amount {}", fromAccountId, toAccountId, amount);
-        return span;
+        BigDecimal value = amount.abs();
+        if (value.compareTo(new BigDecimal("100")) < 0) {
+            return "small";
+        } else if (value.compareTo(new BigDecimal("1000")) < 0) {
+            return "medium";
+        } else if (value.compareTo(new BigDecimal("10000")) < 0) {
+            return "large";
+        } else {
+            return "very_large";
+        }
+    }
+
+    private String extractOperationType(String operationName) {
+        if (operationName == null) return "unknown";
+        String[] parts = operationName.split("\\.");
+        return parts.length > 2 ? parts[2] : "unknown";
+    }
+
+    private void clearOperationMDC() {
+        MDC.remove("operation.id");
+        MDC.remove("operation.type");
+        MDC.remove("transaction.type");
+        MDC.remove("business.domain");
+        MDC.remove("customer.cpf.masked");
+        MDC.remove("account.id");
+        MDC.remove("transaction.amount.range");
+        MDC.remove("db.operation");
+        MDC.remove("db.table");
+        MDC.remove("kafka.operation");
+        MDC.remove("kafka.topic");
+        MDC.remove("error.type");
+        MDC.remove("error.message");
+        MDC.remove("service.name");
+        MDC.remove("environment");
+    }
+
+    public static class BankingSpan {
+        public final String operationId;
+        public final String operationName;
+        private final Timer.Sample timerSample;
+        private final Instant startTime;
+
+        public BankingSpan(String operationId, String operationName, Timer.Sample timerSample) {
+            this.operationId = operationId;
+            this.operationName = operationName;
+            this.timerSample = timerSample;
+            this.startTime = Instant.now();
+        }
+
+        public Instant getStartTime() {
+            return startTime;
+        }
     }
 }
